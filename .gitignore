@@ -9,3 +9,7 @@ trash-can/
 
 # 업로드된 보고서 임시 저장 (나중 단계에서 사용 가능성)
 uploads/
+
+# 바탕화면 바로가기 실행 파일 (이 PC 전용 경로 포함 — 저장소에 올리지 않음)
+report-finder-launch.bat
+report-finder.ico
