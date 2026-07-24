@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Report Finder</title>
+  <style>
+    /* ===== 기본 톤: 심플·미니멀, 네이비/블루 ===== */
+    :root {
+      --navy: #1f3a68;
+      --blue: #3b5f9e;
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --line: #dde3ee;
+      --gray: #5b6b7e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: "Segoe UI", "맑은 고딕", sans-serif;
+      background-color: var(--bg);
+      color: #222;
+    }
+
+    /* ===== 상단 바: 로고 + 보고서 버튼(목록) ===== */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--line);
+      background: var(--card);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand .logo {
+      height: 26px; width: auto; display: block;
+      background: #fff; padding: 3px 6px; border-radius: 6px;
+      border: 1px solid var(--line);
+    }
+    .brand .title { font-size: 15px; font-weight: 600; color: var(--navy); }
+
+    /* 보고서 목록 여는 버튼 */
+    #docs-toggle {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border: 1px solid var(--line); border-radius: 20px;
+      background: #fff; color: var(--navy); font-size: 13px; cursor: pointer;
+    }
+    #docs-toggle:hover { background: var(--bg); }
+
+    /* ===== 본문 ===== */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 24px;
+    }
+    /* 초기(검색 홈) 상태: 로고+검색창을 가운데로 */
+    main.initial { align-items: center; justify-content: center; gap: 28px; }
+
+    /* 히어로(초기 화면 로고·문구) */
+    #hero { text-align: center; }
+    #hero .hero-logo { height: 60px; margin-bottom: 16px; }
+    #hero h1 { margin: 0; font-size: 26px; color: var(--navy); }
+    #hero p { margin: 8px 0 0; font-size: 14px; color: var(--gray); }
+    main.chat #hero { display: none; }
+
+    /* 대화 영역 */
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      width: 100%;
+      max-width: 760px;
+      margin: 0 auto;
+      font-size: 14px;
+    }
+    main.initial #chat { display: none; }
+
+    /* 검색창(질문 입력) — 구글 검색바 느낌의 둥근 알약 */
+    #search-wrap { width: 100%; max-width: 760px; margin: 0 auto; }
+    main.chat #search-wrap { margin-top: 14px; }
+    .search-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px 8px 8px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: 0 2px 10px rgba(20, 40, 80, 0.06);
+    }
+    .search-bar:focus-within { border-color: var(--blue); box-shadow: 0 2px 14px rgba(59, 95, 158, 0.18); }
+    /* + 업로드 버튼 (원형) */
+    #plus-btn {
+      flex-shrink: 0;
+      width: 38px; height: 38px; border-radius: 50%;
+      border: none; background: var(--bg); color: var(--navy);
+      font-size: 22px; line-height: 1; cursor: pointer;
+    }
+    #plus-btn:hover { background: #e7ecf6; }
+    #plus-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #question {
+      flex: 1; border: none; outline: none; background: transparent;
+      font-size: 15px; padding: 8px 4px;
+    }
+    #send {
+      flex-shrink: 0;
+      padding: 9px 18px; border: none; border-radius: 20px;
+      background: var(--blue); color: #fff; font-size: 14px; cursor: pointer;
+    }
+    #send:disabled { background: var(--line); cursor: not-allowed; }
+    /* 업로드 상태 문구 */
+    #upload-status { font-size: 13px; min-height: 18px; margin: 8px 6px 0; text-align: center; }
+    #upload-status.ok { color: #1f7a3d; }
+    #upload-status.fail { color: #b3261e; }
+
+    /* 로딩 표시: 점 3개가 차례로 깜빡 */
+    .loading-dots span { opacity: 0.2; animation: loadingBlink 1.2s infinite; }
+    .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes loadingBlink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+
+    /* 질문/답변 말풍선 */
+    #chat .msg { margin-bottom: 14px; line-height: 1.6; }
+    #chat .msg.q { color: var(--navy); font-weight: 600; }
+    #chat .msg.a { color: #222; }
+    #chat .msg.a.error { color: #b3261e; }
+    #chat .sources { font-size: 12px; color: var(--gray); margin-top: 4px; }
+    #chat .source-link { color: var(--blue); text-decoration: underline; cursor: pointer; }
+    #chat .copy-btn {
+      display: inline-block; margin-top: 6px; padding: 2px 10px;
+      border: 1px solid var(--line); border-radius: 6px; background: #fff;
+      color: var(--gray); font-size: 12px; cursor: pointer;
+    }
+    #chat .copy-btn:hover { background: var(--bg); }
+
+    /* ===== 보고서 목록 패널(드롭다운) ===== */
+    #docs-panel {
+      position: absolute; top: 56px; right: 20px; z-index: 50;
+      width: 320px; max-height: 70vh; overflow-y: auto;
+      background: #fff; border: 1px solid var(--line); border-radius: 12px;
+      box-shadow: 0 8px 28px rgba(20, 40, 80, 0.16);
+      padding: 12px;
+    }
+    #docs-panel[hidden] { display: none; }
+    #docs-panel .panel-head { font-size: 13px; color: var(--gray); margin-bottom: 8px; }
+    #doc-list { margin: 0; padding: 0; list-style: none; }
+    #doc-list .empty { color: var(--gray); font-size: 13px; padding: 8px 4px; }
+    #doc-list li.doc {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 4px; border-bottom: 1px solid var(--line); font-size: 13px;
+    }
+    #doc-list li.doc .doc-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #doc-list li.doc .doc-size { color: var(--gray); font-size: 12px; flex-shrink: 0; }
+    #doc-list li.doc button {
+      border: none; background: none; cursor: pointer; font-size: 14px; padding: 2px 4px; flex-shrink: 0;
+    }
+
+    /* ===== 원문 보기 팝업(모달) ===== */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(20, 40, 80, 0.4);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-box {
+      background: #fff; width: min(520px, 90vw); max-height: 80vh; overflow-y: auto;
+      border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px rgba(20, 40, 80, 0.2);
+    }
+    .modal-title { font-weight: 600; color: var(--navy); font-size: 14px; margin-bottom: 12px; }
+    .modal-body { font-size: 14px; line-height: 1.7; color: #222; white-space: pre-wrap; margin-bottom: 16px; }
+    .modal-close {
+      padding: 8px 20px; border: none; border-radius: 8px;
+      background: var(--blue); color: #fff; font-size: 14px; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- 상단 바 -->
+  <header>
+    <div class="brand">
+      <img class="logo" src="/logo.svg" alt="재정경제부" />
+      <span class="title">Report Finder</span>
+    </div>
+    <button id="docs-toggle">📄 보고서 <span id="doc-count">0</span></button>
+  </header>
+
+  <!-- 보고서 목록 패널 (기본 숨김) -->
+  <div id="docs-panel" hidden>
+    <div class="panel-head">저장: <span id="usage">0개 / 0MB</span> (한도 50개·200MB)</div>
+    <ul id="doc-list">
+      <li class="empty">아직 저장된 보고서가 없습니다.</li>
+    </ul>
+  </div>
+
+  <!-- 본문: 초기(initial)엔 검색 홈, 첫 질문 후 chat 모드로 전환 -->
+  <main id="app" class="initial">
+    <!-- 초기 화면 로고·문구 -->
+    <div id="hero">
+      <img class="hero-logo" src="/logo.svg" alt="재정경제부" />
+      <h1>Report Finder</h1>
+      <p>보고서를 올리고(+), 내용을 검색하듯 질문하세요.</p>
+    </div>
+
+    <!-- 대화 영역 (chat 모드에서 표시) -->
+    <div id="chat"></div>
+
+    <!-- 검색창 (질문 입력 + 업로드 +버튼) -->
+    <div id="search-wrap">
+      <div class="search-bar">
+        <button id="plus-btn" title="보고서 추가 (PDF·Word·txt)">+</button>
+        <input id="file-input" type="file" accept=".pdf,.docx,.txt" hidden />
+        <input id="question" type="text" placeholder="보고서에 대해 질문하세요…" maxlength="1000" />
+        <button id="send">검색</button>
+      </div>
+      <p id="upload-status"></p>
+    </div>
+  </main>
+
+  <script>
+    // ===== 요소 참조 =====
+    const app = document.getElementById('app');
+    const chatEl = document.getElementById('chat');
+    const questionEl = document.getElementById('question');
+    const sendBtn = document.getElementById('send');
+    const plusBtn = document.getElementById('plus-btn');
+    const fileInput = document.getElementById('file-input');
+    const statusEl = document.getElementById('upload-status');
+    const usageEl = document.getElementById('usage');
+    const docList = document.getElementById('doc-list');
+    const docCountEl = document.getElementById('doc-count');
+    const docsToggle = document.getElementById('docs-toggle');
+    const docsPanel = document.getElementById('docs-panel');
+
+    // 초기 화면(검색 홈) → 대화 모드로 전환 (첫 질문/요약 때 1회)
+    function enterChatMode() {
+      if (app.classList.contains('chat')) return;
+      app.classList.remove('initial');
+      app.classList.add('chat');
+    }
+
+    // ===== 보고서 목록 패널 열고 닫기 =====
+    docsToggle.addEventListener('click', () => {
+      docsPanel.hidden = !docsPanel.hidden;
+    });
+    // 패널 바깥을 누르면 닫기
+    document.addEventListener('click', (e) => {
+      if (!docsPanel.hidden && !docsPanel.contains(e.target) && e.target !== docsToggle && !docsToggle.contains(e.target)) {
+        docsPanel.hidden = true;
+      }
+    });
+
+    // ===== 파일 업로드 (+ 버튼) =====
+    const ALLOWED = ['.pdf', '.docx', '.txt'];
+    const MAX_BYTES = 20 * 1024 * 1024;
+
+    function show(msg, ok) {
+      statusEl.textContent = msg;
+      statusEl.className = ok ? 'ok' : 'fail';
+    }
+    function setLoading(el, label) {
+      el.textContent = label + ' ';
+      const dots = document.createElement('span');
+      dots.className = 'loading-dots';
+      dots.append(...['.', '.', '.'].map((d) => { const s = document.createElement('span'); s.textContent = d; return s; }));
+      el.appendChild(dots);
+    }
+    function showLoading(label) {
+      statusEl.className = 'ok';
+      setLoading(statusEl, label);
+    }
+
+    async function upload(file) {
+      const ext = '.' + file.name.split('.').pop().toLowerCase();
+      if (!ALLOWED.includes(ext)) {
+        return show('지원하지 않는 형식이거나 용량을 초과했습니다 (PDF·Word(.docx)·txt만 가능)', false);
+      }
+      if (file.size > MAX_BYTES) {
+        return show('지원하지 않는 형식이거나 용량을 초과했습니다 (파일당 20MB 이하)', false);
+      }
+      showLoading('업로드 중');
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'x-file-name': encodeURIComponent(file.name) },
+          body: file,
+        });
+        const data = await res.json();
+        if (!res.ok) return show(data.error.message, false);
+        show(`"${data.document.name}" ${data.message}`, true);
+        loadDocuments();
+      } catch {
+        show('일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요', false);
+      }
+    }
+
+    plusBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) upload(fileInput.files[0]);
+      fileInput.value = '';
+    });
+
+    // ===== 보고서 목록·삭제·요약 + 저장 현황 =====
+    function prettySize(bytes) {
+      if (bytes < 1024) return bytes + 'B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+    }
+
+    async function loadDocuments() {
+      try {
+        const res = await fetch('/api/documents');
+        const data = await res.json();
+        if (!res.ok) {
+          docList.innerHTML = '';
+          const li = document.createElement('li');
+          li.className = 'empty';
+          li.textContent = data.error.message;
+          docList.appendChild(li);
+          return;
+        }
+        docCountEl.textContent = data.usage.count;
+        usageEl.textContent = `${data.usage.count}개 / ${prettySize(data.usage.totalBytes)}`;
+
+        docList.innerHTML = '';
+        if (data.documents.length === 0) {
+          const li = document.createElement('li');
+          li.className = 'empty';
+          li.textContent = '아직 저장된 보고서가 없습니다.';
+          docList.appendChild(li);
+          return;
+        }
+        for (const doc of data.documents) {
+          const li = document.createElement('li');
+          li.className = 'doc';
+
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'doc-name';
+          nameSpan.textContent = doc.name;
+          nameSpan.title = doc.name;
+
+          const sizeSpan = document.createElement('span');
+          sizeSpan.className = 'doc-size';
+          sizeSpan.textContent = prettySize(doc.size_bytes);
+
+          // 요약 버튼
+          const sumBtn = document.createElement('button');
+          sumBtn.textContent = '📝';
+          sumBtn.title = '이 보고서 요약';
+          sumBtn.addEventListener('click', async () => {
+            sumBtn.disabled = true;
+            docsPanel.hidden = true;      // 패널 닫고 대화로
+            enterChatMode();
+            addMsg('q', `📝 "${doc.name}" 요약 요청`);
+            const waiting = addMsg('a', '');
+            setLoading(waiting, '요약 생성 중');
+            try {
+              const r = await fetch(`/api/documents/${doc.id}/summary`, { method: 'POST' });
+              const d = await r.json();
+              if (!r.ok) {
+                waiting.textContent = d.error.message;
+                waiting.classList.add('error');
+              } else {
+                waiting.textContent = d.summary;
+                const src = document.createElement('div');
+                src.className = 'sources';
+                src.textContent = '📎 출처: ' + d.source.name;
+                waiting.appendChild(src);
+                addCopyButton(waiting, d.summary);
+              }
+            } catch {
+              waiting.textContent = '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요';
+              waiting.classList.add('error');
+            } finally {
+              sumBtn.disabled = false;
+            }
+          });
+
+          // 삭제 버튼
+          const delBtn = document.createElement('button');
+          delBtn.textContent = '🗑';
+          delBtn.title = '삭제';
+          delBtn.addEventListener('click', async () => {
+            if (!confirm(`"${doc.name}" 보고서를 삭제할까요?`)) return;
+            const r = await fetch(`/api/documents/${doc.id}`, { method: 'DELETE' });
+            if (r.ok) loadDocuments();
+            else show('삭제에 실패했습니다. 잠시 후 다시 시도해 주세요', false);
+          });
+
+          li.append(nameSpan, sizeSpan, sumBtn, delBtn);
+          docList.appendChild(li);
+        }
+      } catch {
+        docCountEl.textContent = '?';
+        usageEl.textContent = '확인 불가';
+      }
+    }
+    loadDocuments();
+
+    // ===== 대화(질문·답변) =====
+    function addMsg(cls, text) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + cls;
+      div.textContent = text;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      return div;
+    }
+
+    // 텍스트 클립보드 복사 (최신 API → 실패 시 구형 방식)
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+          document.body.appendChild(ta);
+          ta.focus(); ta.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          return ok;
+        } catch { return false; }
+      }
+    }
+    function addCopyButton(container, text) {
+      const btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.textContent = '복사';
+      btn.title = '내용 복사';
+      btn.addEventListener('click', async () => {
+        btn.textContent = (await copyText(text)) ? '복사됨' : '복사 실패';
+        setTimeout(() => { btn.textContent = '복사'; }, 1500);
+      });
+      container.appendChild(btn);
+    }
+
+    // 출처 원문 보기 팝업
+    function showSource(s) {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      const box = document.createElement('div');
+      box.className = 'modal-box';
+      const title = document.createElement('div');
+      title.className = 'modal-title';
+      title.textContent = `📄 ${s.name} / ${s.location}`;
+      const body = document.createElement('div');
+      body.className = 'modal-body';
+      body.textContent = s.content || '(원문을 불러올 수 없습니다)';
+      const close = document.createElement('button');
+      close.className = 'modal-close';
+      close.textContent = '닫기';
+      const dismiss = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+      const onKey = (e) => { if (e.key === 'Escape') dismiss(); };
+      close.addEventListener('click', dismiss);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) dismiss(); });
+      document.addEventListener('keydown', onKey);
+      box.append(title, body, close);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+    }
+
+    // 출처 목록을 클릭 가능한 링크로
+    function renderSources(container, sources) {
+      const src = document.createElement('div');
+      src.className = 'sources';
+      src.appendChild(document.createTextNode('📎 출처: '));
+      sources.forEach((s, i) => {
+        if (i > 0) src.appendChild(document.createTextNode(', '));
+        const link = document.createElement('span');
+        link.className = 'source-link';
+        link.textContent = `${s.name} / ${s.location}`;
+        link.title = '클릭하면 원문을 봅니다';
+        link.addEventListener('click', () => showSource(s));
+        src.appendChild(link);
+      });
+      container.appendChild(src);
+    }
+
+    // 질문 보내기 (첫 질문 시 대화 모드로 전환)
+    async function ask() {
+      const question = questionEl.value.trim();
+      if (!question) return;
+      questionEl.value = '';
+      questionEl.disabled = sendBtn.disabled = true;
+      enterChatMode();
+
+      addMsg('q', 'Q. ' + question);
+      const waiting = addMsg('a', '');
+      setLoading(waiting, '답변 생성 중');
+
+      try {
+        const res = await fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          waiting.textContent = data.error.message;
+          waiting.classList.add('error');
+        } else {
+          waiting.textContent = 'A. ' + data.answer;
+          if (data.sources.length > 0) renderSources(waiting, data.sources);
+          addCopyButton(waiting, data.answer);
+        }
+      } catch {
+        waiting.textContent = '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요';
+        waiting.classList.add('error');
+      } finally {
+        questionEl.disabled = sendBtn.disabled = false;
+        questionEl.focus();
+        chatEl.scrollTop = chatEl.scrollHeight;
+      }
+    }
+
+    sendBtn.addEventListener('click', ask);
+    questionEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(); });
+  </script>
+</body>
+</html>

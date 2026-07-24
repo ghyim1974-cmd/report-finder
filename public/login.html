@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로그인 · Report Finder</title>
+  <style>
+    /* DESIGN 1장 톤: 심플·미니멀, 네이비/블루 */
+    body {
+      margin: 0; height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      font-family: "Segoe UI", "맑은 고딕", sans-serif;
+      background-color: #f4f6fb;
+    }
+    .card {
+      width: 320px; padding: 32px;
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(20, 40, 80, 0.08);
+      text-align: center;
+    }
+    .card h1 { margin: 0 0 4px; font-size: 18px; color: #1f3a68; }
+    .card p { margin: 0 0 20px; font-size: 13px; color: #5b6b7e; }
+    input {
+      width: 100%; box-sizing: border-box; padding: 10px 12px;
+      border: 1px solid #dde3ee; border-radius: 8px; font-size: 14px;
+      margin-bottom: 12px;
+    }
+    button {
+      width: 100%; padding: 10px; border: none; border-radius: 8px;
+      background: #3b5f9e; color: #fff; font-size: 14px; cursor: pointer;
+    }
+    #msg { color: #b3261e; font-size: 13px; min-height: 18px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>📄 Report Finder</h1>
+    <p>접근 비밀번호를 입력하세요</p>
+    <input id="pw" type="password" placeholder="비밀번호" autofocus />
+    <button id="go">들어가기</button>
+    <div id="msg"></div>
+  </div>
+
+  <script>
+    const pw = document.getElementById('pw');
+    const go = document.getElementById('go');
+    const msg = document.getElementById('msg');
+
+    async function login() {
+      go.disabled = true;
+      msg.textContent = '';
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pw.value }),
+        });
+        if (res.ok) {
+          location.href = '/'; // 인증 성공 → 메인 화면
+        } else {
+          const d = await res.json();
+          msg.textContent = d.error.message;
+        }
+      } catch {
+        msg.textContent = '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요';
+      } finally {
+        go.disabled = false;
+      }
+    }
+
+    go.addEventListener('click', login);
+    pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+  </script>
+</body>
+</html>
